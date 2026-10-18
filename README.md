@@ -133,6 +133,15 @@ Draft routing follows the declared promotion action: `mark-ready` continues,
 draft therefore does not remain stuck after its promotion condition is met,
 while an intentional evaluation draft is not churned as repair work.
 
+Owner obligations use the same independent-completion rule. Run
+`bin/cockswain-owner-collect` to snapshot a complete, digest-bound owner
+enumeration, then pass its generated `work-item.json` to
+`bin/cockswain-supervise` with a private `COCKSWAIN_OWNER_STATE_DIRECTORY`.
+The deterministic owner controller preserves full cell and attempt projections,
+continues useful mechanical work before physical boundaries, and refuses DONE
+for partial pagination, stale evidence, disappearing failures, or unsupported
+supersession. See [`docs/owner-records.md`](docs/owner-records.md).
+
 ## Candidate models
 
 The initial matrix in `models/models.json` is:

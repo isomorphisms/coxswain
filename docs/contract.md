@@ -35,3 +35,17 @@ DONE is not terminal authority. The controller must independently refresh object
 5. Extra latency or compute.
 
 The evaluation harness reports the first two explicitly.
+
+## Objective owner records
+
+When a work item comes from `cockswain-owner-collect`, the owner revision,
+complete denominator, cells, attempts and evidence identities are objective
+inputs. `cockswain-owner-state` validates them before choosing an action. Useful
+mechanical cells take precedence over waiting and human-only cells. DONE is
+allowed only after a fresh complete enumeration contains no failed,
+actionable, waiting, or human-only cell.
+
+Owner-declared unsupported or conditional scope remains visible with its
+reason; it is not PASS. A complete cell requires source-bound evidence at its
+declared acceptance kind. A superseded cell remains in history and needs a
+same-scope successor plus exact supersession evidence.
