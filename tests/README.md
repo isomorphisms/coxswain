@@ -53,6 +53,15 @@ actual output through this consumer, including paginated, empty, failed, and
 managed collections. These are deterministic API fixtures, not live GitHub
 account or supervisor-model acceptance.
 
+`tests/test-owner-records.sh` runs exact Cat Food build-plan bytes through the
+actual owner collector and deterministic supervisor path. It covers mixed
+CONTINUE/HUMAN work, independent WAIT/HUMAN/DONE decisions, stable replay,
+preserved failed attempts, explicit unsupported/conditional scope, and
+rejection of omitted cells, partial pagination, ref movement, stale evidence,
+unsupported-as-PASS, and unevidenced supersession. These are host-side contract
+controls. They do not establish a live model judgment, build, package,
+installation, launch, or physical-device result.
+
 ## Dispatch contract
 
 `tests/test-dispatch.sh` defines the controller boundary:

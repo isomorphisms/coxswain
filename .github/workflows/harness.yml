@@ -21,7 +21,7 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Check shell syntax
         run: |
-          for script in bin/cockswain-* bin/import-chatgpt-export tests/test-corpus-cases.sh tests/test-behavior-cases.sh tests/test-merge-state.sh tests/test-pr-retirement.sh tests/test-retirement-loop.sh tests/test-authority-receipt.sh tests/test-authority-decision.sh tests/test-authority-collector.sh; do
+          for script in bin/cockswain-* bin/import-chatgpt-export tests/test-corpus-cases.sh tests/test-behavior-cases.sh tests/test-merge-state.sh tests/test-pr-retirement.sh tests/test-retirement-loop.sh tests/test-owner-records.sh tests/test-authority-receipt.sh tests/test-authority-decision.sh tests/test-authority-collector.sh; do
             sh -n "$script"
           done
       - name: Verify verbatim corpus evaluation contract
@@ -34,6 +34,8 @@ jobs:
         run: sh tests/test-pr-retirement.sh
       - name: Drain READY retirements with durable failed-write state
         run: sh tests/test-retirement-loop.sh
+      - name: Reconcile complete owner records without losing attempts
+        run: sh tests/test-owner-records.sh
       - name: Fetch the pinned account collection contract
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
