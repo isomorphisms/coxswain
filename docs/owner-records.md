@@ -65,3 +65,8 @@ candidate head `a9595ec901268dca0ebee99f594e0e8797668c39`, supplies the
 unmerged observation vocabulary and lossless-attempt requirement. Cockswain
 retains all owner attempts but does not relabel that candidate as an accepted
 AICI verdict interface.
+
+No released BC-A06 transition producer was present at this head. The cell
+projection retains explicit dependency state and evidenced supersession for
+that producer, but end-to-end A06 consumption remains conditional on its exact
+released bytes. This branch claims the Cockswain source/fixture boundary only.

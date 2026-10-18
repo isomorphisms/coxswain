@@ -233,6 +233,11 @@ cp -R "$tmp/done" "$tmp/stale-evidence"
 printf '%s\n' changed >> "$tmp/stale-evidence/evidence/phone-build.tsv"
 reject_case stale-evidence 'complete cell evidence bytes are missing or stale' "$tmp/stale-evidence"
 
+cp -R "$tmp/done" "$tmp/symlink-evidence"
+mv "$tmp/symlink-evidence/evidence/phone-build.tsv" "$tmp/symlink-evidence/outside-evidence.tsv"
+ln -s ../outside-evidence.tsv "$tmp/symlink-evidence/evidence/phone-build.tsv"
+reject_case symlink-evidence 'complete cell evidence bytes are missing or stale' "$tmp/symlink-evidence"
+
 cp -R "$tmp/done" "$tmp/unsupported-pass"
 awk -F '\t' -v OFS='\t' -v source="$source_identity" -v digest="$c67_evidence" '
     NR==3 {$11="physical"; $12="evidence/forged"; $13=source; $14=digest} {print}

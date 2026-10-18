@@ -246,8 +246,9 @@ while IFS="$tab" read -r cell_id target cell_source scope material cell_policy c
                 evidence/*) ;;
                 *) printf 'cockswain: complete cell evidence is not locally refreshable: %s\n' "$cell_id" >&2; exit 65 ;;
             esac
-            case "$evidence_locator" in *..*|*[!A-Za-z0-9._/+:-]*) echo 'cockswain: unsafe evidence locator' >&2; exit 65 ;; esac
-            [ -f "$snapshot/$evidence_locator" ] &&
+            case "$evidence_locator" in evidence/*/*|*..*|*[!A-Za-z0-9._/+:-]*) echo 'cockswain: unsafe evidence locator' >&2; exit 65 ;; esac
+            [ -d "$snapshot/evidence" ] && [ ! -L "$snapshot/evidence" ] &&
+            [ -f "$snapshot/$evidence_locator" ] && [ ! -L "$snapshot/$evidence_locator" ] &&
             [ "$(digest "$snapshot/$evidence_locator")" = "$evidence_sha" ] || {
                 printf 'cockswain: complete cell evidence bytes are missing or stale: %s\n' "$cell_id" >&2
                 exit 65
@@ -258,8 +259,9 @@ while IFS="$tab" read -r cell_id target cell_source scope material cell_policy c
                 evidence/*) ;;
                 *) printf 'cockswain: supersession evidence is not locally refreshable: %s\n' "$cell_id" >&2; exit 65 ;;
             esac
-            case "$supersession_locator" in *..*|*[!A-Za-z0-9._/+:-]*) echo 'cockswain: unsafe supersession evidence locator' >&2; exit 65 ;; esac
-            [ -f "$snapshot/$supersession_locator" ] &&
+            case "$supersession_locator" in evidence/*/*|*..*|*[!A-Za-z0-9._/+:-]*) echo 'cockswain: unsafe supersession evidence locator' >&2; exit 65 ;; esac
+            [ -d "$snapshot/evidence" ] && [ ! -L "$snapshot/evidence" ] &&
+            [ -f "$snapshot/$supersession_locator" ] && [ ! -L "$snapshot/$supersession_locator" ] &&
             [ "$(digest "$snapshot/$supersession_locator")" = "$supersession_sha" ] || {
                 printf 'cockswain: supersession evidence bytes are missing or stale: %s\n' "$cell_id" >&2
                 exit 65
