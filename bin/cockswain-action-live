@@ -1,0 +1,76 @@
+#!/bin/sh
+# Fail-closed action boundary for Coxswain. Invoked only by --apply.
+set -eu
+[ "$#" -eq 1 ] || exit 64
+request=$1
+: "${AICI_ROOT:?set AICI_ROOT to a pinned ai-ci checkout}"
+: "${COCKSWAIN_ACCOUNT_OWNER:?set COCKSWAIN_ACCOUNT_OWNER}"
+: "${COCKSWAIN_POLICY_REGISTRY:?set COCKSWAIN_POLICY_REGISTRY}"
+[ -x "$AICI_ROOT/merge/collect-account.sh" ] || exit 66
+command -v jq >/dev/null
+value() { awk -F '\t' -v k="$1" '$1==k {if (++n>1) exit 2; v=$2} END {if(n!=1) exit 1; print v}' "$request"; }
+[ "$(value schema)" = cockswain-retirement-action-request-v1 ] || exit 65
+repository=$(value repository)
+pr=$(value pr)
+expected=$(value expected_head)
+action=$(value action)
+authority_kind=$(value authority_kind)
+authority_ref=$(value authority_receipt_ref)
+[ "$action" = merge ] || exit 65
+printf '%s' "$repository" | grep -Eq '^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' || exit 65
+printf '%s' "$pr" | grep -Eq '^[1-9][0-9]*$' || exit 65
+printf '%s' "$expected" | grep -Eq '^[0-9a-f]{40}$' || exit 65
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+# A fresh complete-account sweep is mandatory; never reuse the selector snapshot.
+"$AICI_ROOT/merge/collect-account.sh" "$COCKSWAIN_ACCOUNT_OWNER" "$COCKSWAIN_POLICY_REGISTRY" "$work/account" > "$work/collection.log"
+slug=$(printf '%s-%s' "$repository" "$pr" | tr '/' '-')
+snapshot=$work/account/managed/$slug
+observed=-
+pre_state=UNKNOWN
+status=FAILED
+outcome=NOT_APPLIED
+retryable=no
+error_class=REAUTHORIZATION_REQUIRED
+error_message=live-state-not-authorized
+if [ -f "$work/account/collection.tsv" ] &&
+   grep -qx "$(printf 'status\tCOMPLETE')" "$work/account/collection.tsv" &&
+   awk -F '\t' -v r="$repository" -v p="$pr" 'NR>1 && $1==r && $2==p && $3=="READY" {ok++} END {exit !(ok==1)}' "$work/account/managed/results.tsv" &&
+   [ -f "$snapshot/pr.tsv" ] && [ -f "$snapshot/authorization.tsv" ]; then
+  observed=$(awk -F '\t' '$1=="head_sha" {print $2}' "$snapshot/pr.tsv")
+  pre_state=READY
+  current_kind=$(awk -F '\t' '$1=="authority_kind" {print $2}' "$snapshot/authorization.tsv")
+  current_ref=$(awk -F '\t' '$1=="receipt_ref" {print $2}' "$snapshot/authorization.tsv")
+  current_state=$(awk -F '\t' '$1=="state" {print $2}' "$snapshot/authorization.tsv")
+  current_scope=$(awk -F '\t' '$1=="scope_state" {print $2}' "$snapshot/authorization.tsv")
+  if [ "$observed" = "$expected" ] && [ "$current_kind" = "$authority_kind" ] &&
+     [ "$current_ref" = "$authority_ref" ] && [ "$current_state" = valid ] &&
+     [ "$current_scope" = same ]; then
+    # Explicitly enabled only for a credentialed, user-approved deployment.
+    if [ "${COCKSWAIN_ALLOW_MERGE:-no}" = yes ]; then
+      token=${GITHUB_TOKEN:-${GH_TOKEN:-}}
+      [ -n "$token" ] || { error_class=MISSING_CREDENTIAL; error_message=missing-github-token; }
+      if [ -n "$token" ]; then
+        payload=$(jq -cn --arg sha "$expected" '{sha:$sha,merge_method:"squash"}')
+        response=$(curl -fsS -X PUT -H 'Accept: application/vnd.github+json' \
+          -H "Authorization: Bearer $token" -H 'X-GitHub-Api-Version: 2022-11-28' \
+          -H 'Content-Type: application/json' --data "$payload" \
+          "https://api.github.com/repos/$repository/pulls/$pr/merge") || response='{}'
+        if [ "$(printf '%s' "$response" | jq -r '.merged // false')" = true ]; then
+          status=SUCCEEDED; outcome=MERGED; error_class=-; error_message=-
+        else
+          error_class=MERGE_REJECTED; error_message=github-rejected-merge
+        fi
+      fi
+    else
+      error_class=WRITE_DISABLED; error_message=merge-write-not-enabled
+    fi
+  else
+    error_class=STALE_REQUEST; error_message=head-or-authority-changed
+  fi
+fi
+printf 'schema\tcockswain-retirement-action-result-v1\n'
+printf 'status\t%s\nrepository\t%s\npr\t%s\n' "$status" "$repository" "$pr"
+printf 'expected_head\t%s\nobserved_head\t%s\naction\tmerge\n' "$expected" "$observed"
+printf 'pre_action_state\t%s\nresult\t%s\nretryable\t%s\n' "$pre_state" "$outcome" "$retryable"
+printf 'error_class\t%s\nerror_message\t%s\n' "$error_class" "$error_message"
