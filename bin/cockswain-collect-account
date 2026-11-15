@@ -1,0 +1,18 @@
+#!/bin/sh
+# Adapter for ai-ci's complete account collection. No GitHub writes.
+set -eu
+[ "$#" -eq 1 ] || { echo 'usage: cockswain-collect-account OUTPUT_DIRECTORY' >&2; exit 64; }
+: "${AICI_ROOT:?set AICI_ROOT to a pinned ai-ci checkout}"
+: "${COCKSWAIN_ACCOUNT_OWNER:?set COCKSWAIN_ACCOUNT_OWNER}"
+: "${COCKSWAIN_POLICY_REGISTRY:?set COCKSWAIN_POLICY_REGISTRY}"
+[ -f "$COCKSWAIN_POLICY_REGISTRY" ] || exit 66
+[ -x "$AICI_ROOT/merge/collect-account.sh" ] || exit 66
+"$AICI_ROOT/merge/collect-account.sh" "$COCKSWAIN_ACCOUNT_OWNER" "$COCKSWAIN_POLICY_REGISTRY" "$1"
+# Do not interpret a successful shell exit as a complete collection.
+awk -F '\t' '
+  NF!=2 || seen[$1]++ { bad=1 }
+  $1=="schema" && $2=="aici-account-collection-v2" { schema=1 }
+  $1=="status" && $2=="COMPLETE" { complete=1 }
+  $1=="scope" && $2=="owner-authored-visible-repositories" { scope=1 }
+  END { exit !(schema && complete && scope && !bad) }
+' "$1/collection.tsv"
