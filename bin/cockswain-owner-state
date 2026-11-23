@@ -211,6 +211,7 @@ awk -F '\t' -v source="$owner_source" -v material="$owner_record_sha256" \
     $9=="COMPLETE" && ($10!="SATISFIED" || $11=="-" || $12=="-" || $13!=$3 || $14=="-") {
         bad="complete cell lacks current source-bound evidence"; exit
     }
+    $9=="COMPLETE" && $11!=$8 {bad="evidence kind does not satisfy acceptance kind"; exit}
     ($9=="UNSUPPORTED" || $9=="CONDITIONAL") &&
       ($10!="NOT_APPLICABLE" || $11!="-" || $12!="-" || $13!="-" || $14!="-" || $18=="-") {
         bad="unsupported or conditional cell was promoted or lacks a reason"; exit

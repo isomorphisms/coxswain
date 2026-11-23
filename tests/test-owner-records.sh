@@ -203,6 +203,15 @@ seal_collection "$tmp/superseded"
 new_case "$tmp/conditional" COMPLETE SATISFIED CONDITIONAL NOT_APPLICABLE
 "$root/bin/cockswain-owner-state" --validate "$tmp/conditional"
 
+# Both rows describe the same observed build, but the outstanding obligation
+# requires physical execution. Matching a PASS attempt must preserve its kind.
+new_case "$tmp/build-for-physical" COMPLETE SATISFIED COMPLETE SATISFIED
+awk -F '\t' -v OFS='\t' 'NR==2 {$8="physical"} {print}' \
+    "$tmp/build-for-physical/cells.tsv" > "$tmp/build-for-physical/cells.new"
+mv "$tmp/build-for-physical/cells.new" "$tmp/build-for-physical/cells.tsv"
+seal_collection "$tmp/build-for-physical"
+reject_case build-for-physical 'evidence kind does not satisfy acceptance kind' "$tmp/build-for-physical"
+
 # Omitted cells, incomplete pagination, ref movement and stale evidence cannot
 # collapse the declared denominator into DONE.
 cp -R "$tmp/done" "$tmp/omitted"

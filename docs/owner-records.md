@@ -37,7 +37,9 @@ history. A refresh may add attempts and obligations. It cannot omit a prior
 cell or attempt, so interruption and retry do not erase a failure. Replaying
 equal bytes reuses the same scan receipt and obligation identities.
 
-Complete evidence must match the current source and material. Unsupported or
+Complete evidence must match the current source, material and acceptance kind.
+A build receipt can complete a build cell. A physical cell requires a
+physical receipt and its matching attempt. Unsupported or
 conditional cells cannot carry PASS evidence. Supersession requires an exact
 evidence digest and a present successor with the same scope and acceptance
 kind. Partial pagination, denominator mismatch, stale policy/profile/material,
