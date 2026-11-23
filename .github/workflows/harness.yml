@@ -48,6 +48,18 @@ jobs:
           export COCKSWAIN_PR_RETIREMENT="$GITHUB_WORKSPACE/bin/cockswain-pr-retirement"
           sh .ci-ai-ci/tests/merge-account.sh
           sh .ci-ai-ci/tests/merge-collector.sh
+      - name: Fetch the released defect-registration input
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: 07f84bd3f368efe393fcef6b740633078b2b22dc
+          path: .ci-ai-ci-defect
+          persist-credentials: false
+      - name: Keep the registered defect obligations open
+        run: |
+          test "$(git -C .ci-ai-ci-defect rev-parse HEAD)" = 07f84bd3f368efe393fcef6b740633078b2b22dc
+          sh -n tests/test-defect-registration.sh
+          sh tests/test-defect-registration.sh .ci-ai-ci-defect
       - name: Preserve contextual authority provenance
         run: |
           sh tests/test-authority-receipt.sh

@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -ne 2 ]; then
+    echo 'usage: cockswain-defect-state INCIDENT OWNER_RELEASE.tsv' >&2
+    exit 64
+fi
+incident=$1
+release=$2
+case "$incident" in
+    2026-10-holomorphic-generated-test-proxy)
+        # Published by ai-ci@07f84bd3f368efe393fcef6b740633078b2b22dc.
+        expected_digest=6a6e262f67741632fe4d3c2f5efa37c32be4f5f4600febd328f2f475362a59c5
+        ;;
+    *)
+        echo 'cockswain: unsupported defect registration' >&2
+        exit 65
+        ;;
+esac
+
+snapshot=$(mktemp)
+trap 'rm -f "$snapshot"' EXIT HUP INT TERM
+cat "$release" > "$snapshot"
+digest=$(sha256sum "$snapshot")
+if [ "${digest%% *}" != "$expected_digest" ]; then
+    echo 'cockswain: defect registration differs from the released owner obligations' >&2
+    exit 65
+fi
+
+# The registration describes work and dependencies. There is no independent
+# execution verdict in this release. Each registered row remains unresolved.
+jq -nR --arg incident "$incident" '
+    [inputs] | .[1:] | map(split("\t") |
+        {id: .[0], owner: .[2], dependency: .[5], next: .[6], limit: .[7]}) as $obligations |
+    ([$obligations[] | select(.dependency == "ready")][0]) as $ready |
+    {
+        action: (if $ready then "CONTINUE" else "WAIT" end),
+        rationale: ($incident + " has " + ($obligations | length | tostring) + " unresolved owner obligations"),
+        next_prompt: (if $ready then $ready.id + " (" + $ready.owner + ") " + $ready.next else null end),
+        human_question: null,
+        evidence_gaps: ($obligations | map(.id + " [" + .dependency + "] " + .limit))
+    }
+' < "$snapshot"
