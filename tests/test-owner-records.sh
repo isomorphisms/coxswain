@@ -56,7 +56,7 @@ new_case() {
     c67_state=$4
     c67_dependency=$5
     mkdir -p "$directory"
-    cp "$root/tests/owner-records/catfood-plan.tsv" "$directory/owner-record.tsv"
+    cp "${6:-$root/tests/owner-records/catfood-plan.tsv}" "$directory/owner-record.tsv"
     material=$(sha256sum "$directory/owner-record.tsv" | awk '{print $1}')
     phone_kind=build
     phone_evidence_kind=-
@@ -214,6 +214,18 @@ reject_case build-for-physical 'evidence kind does not satisfy acceptance kind' 
 
 # Omitted cells, incomplete pagination, ref movement and stale evidence cannot
 # collapse the declared denominator into DONE.
+mkdir "$tmp/empty-plan"
+awk -F '\t' '{print} $1=="target" {exit}' "$root/tests/owner-records/catfood-plan.tsv" > "$tmp/empty-plan/owner-record.tsv"
+printf '%b\n' "$cells_header" > "$tmp/empty-plan/cells.tsv"
+printf '%b\n' "$attempts_header" > "$tmp/empty-plan/attempts.tsv"
+seal_collection "$tmp/empty-plan" 1 1 0 0 0 0
+reject_case empty-plan 'malformed Cat Food owner plan' "$tmp/empty-plan"
+
+cp "$root/tests/owner-records/catfood-plan.tsv" "$tmp/truncated-row.tsv"
+printf 'incomplete-target\tdevice\t\n' >> "$tmp/truncated-row.tsv"
+new_case "$tmp/truncated-row" COMPLETE SATISFIED COMPLETE SATISFIED "$tmp/truncated-row.tsv"
+reject_case truncated-row 'malformed Cat Food owner plan' "$tmp/truncated-row"
+
 cp -R "$tmp/done" "$tmp/omitted"
 sed -n '1,2p' "$tmp/omitted/cells.tsv" > "$tmp/omitted/cells.new"
 mv "$tmp/omitted/cells.new" "$tmp/omitted/cells.tsv"

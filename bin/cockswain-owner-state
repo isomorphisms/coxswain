@@ -159,10 +159,14 @@ owner_source=$(awk -F '\t' '$1=="source_sha" {n++; value=$2} END {if(n!=1) exit 
     echo 'cockswain: owner record lacks one source identity' >&2; exit 65;
 }
 is_commit "$owner_source" || { echo 'cockswain: invalid owner source identity' >&2; exit 65; }
-owner_targets=$(awk -F '\t' '
+requested_target=$(require_value "$owner_record" requested_target)
+owner_targets=$(awk -F '\t' -v requested="$requested_target" '
     $0=="target\tdevice\tabi\tobligation\tacceptance" {header++; next}
-    header==1 && NF==5 {if(seen[$1]++) bad=1; count++}
-    END {if(header!=1 || bad) exit 1; print count+0}
+    header {
+        if(NF!=5 || $1=="" || $2=="" || $3=="" || $4=="" || $5=="" || seen[$1]++) bad=1
+        count++
+    }
+    END {if(header!=1 || bad || !(requested in seen)) exit 1; print count}
 ' "$owner_record") || {
     echo 'cockswain: malformed Cat Food owner plan' >&2; exit 65;
 }
