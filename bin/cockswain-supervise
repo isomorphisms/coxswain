@@ -20,6 +20,17 @@ owner_snapshot=$(jq -r '.state.owner_record_snapshot // ""' "$case_file") || {
     echo 'cockswain: invalid work item JSON' >&2
     exit 65
 }
+if jq -e '.state | objects | has("defect_registration")' "$case_file" >/dev/null; then
+    if [ -n "$owner_snapshot" ]; then
+        echo 'cockswain: work item selects both an owner snapshot and a defect registration' >&2
+        exit 65
+    fi
+    incident=$(jq -er '.state.defect_registration | strings' "$case_file") || {
+        echo 'cockswain: defect registration must be an incident name' >&2
+        exit 65
+    }
+    exec "$repo_dir/bin/cockswain-defect-state" "$incident" "${COCKSWAIN_DEFECT_RELEASE_FILE:?set COCKSWAIN_DEFECT_RELEASE_FILE}"
+fi
 if [ -n "$owner_snapshot" ]; then
     owner_state=${COCKSWAIN_OWNER_STATE_DIRECTORY:?set COCKSWAIN_OWNER_STATE_DIRECTORY}
     decision=$("$repo_dir/bin/cockswain-owner-state" "$owner_snapshot" "$owner_state")

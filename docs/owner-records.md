@@ -51,6 +51,19 @@ model for this mechanical classification. Semantic claim interpretation still
 requires a separately accepted model endpoint and its own qualification; no
 fixture result is promoted to that boundary.
 
+## Defect registrations
+
+A work item with `state.defect_registration` set to
+`2026-10-holomorphic-generated-test-proxy` selects the registered Holomorphic
+incident. Point `COCKSWAIN_DEFECT_RELEASE_FILE` to the owner's
+`incidents/2026-10-holomorphic-generated-test-proxy/release/obligations.tsv`
+from ai-ci revision `07f84bd3f368efe393fcef6b740633078b2b22dc`.
+The controller checks the published bytes before reading the list. It
+continues the first ready obligation and includes every remaining owner
+obligation and its evidence limit in the decision. The release supplies
+registration and dependencies. Retirement additionally requires the
+independent verdict and transition records from the owning repositories.
+
 ## Candidate compatibility inputs
 
 [isomorphisms/catfood PR #143, “Bind Android currentness to approved package
