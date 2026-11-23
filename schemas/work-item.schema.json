@@ -11,7 +11,87 @@
     "expected_action_without_history": {"enum": ["CONTINUE", "WAIT", "HUMAN", "DONE"]},
     "goal": {"type": "string", "minLength": 1},
     "source": {"type": "object"},
-    "state": {"type": "object"},
+    "state": {
+      "type": "object",
+      "properties": {
+        "owner_record_snapshot": {"type": "string", "minLength": 1},
+        "owner_record_collection": {
+          "type": "object",
+          "required": [
+            "owner",
+            "owner_revision",
+            "owner_locator",
+            "owner_record_sha256",
+            "policy_sha256",
+            "profile_sha256",
+            "collection_sha256",
+            "enumeration_complete",
+            "cell_count",
+            "attempt_count"
+          ],
+          "properties": {
+            "owner": {"type": "string", "minLength": 1},
+            "owner_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+            "owner_locator": {"type": "string", "minLength": 1},
+            "owner_record_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "profile_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "collection_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "enumeration_complete": {"const": true},
+            "cell_count": {"type": "integer", "minimum": 0},
+            "attempt_count": {"type": "integer", "minimum": 0}
+          },
+          "additionalProperties": true
+        },
+        "owner_obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "cell_id",
+              "target",
+              "source_identity",
+              "scope_sha256",
+              "material_sha256",
+              "policy_sha256",
+              "profile_sha256",
+              "acceptance_kind",
+              "state",
+              "dependency_state",
+              "evidence_kind",
+              "evidence_locator",
+              "evidence_source_identity",
+              "evidence_sha256",
+              "superseded_by",
+              "supersession_evidence_locator",
+              "supersession_evidence_sha256",
+              "reason",
+              "next_action"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "owner_attempts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "cell_id",
+              "attempt_id",
+              "observation",
+              "source_identity",
+              "material_sha256",
+              "evidence_kind",
+              "evidence_locator",
+              "evidence_sha256",
+              "detail"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "unresolved": {
       "type": "array",
       "items": {"type": "string"}

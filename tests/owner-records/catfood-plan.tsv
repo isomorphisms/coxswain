@@ -1,0 +1,15 @@
+schema	catfood-android-build-plan-v1
+catfood_commit	b387f90d3973aae39ba19d370a830da627299ab1
+matrix_sha256	97bb5fc4a79eb34e53a53fb7a10e6ccd99feef3143345da2c5ffa18e7f3aa431
+labels_sha256	9f7e65468378bd383bd26c34b589560880909797c0854e22756c1132c3102281
+contract_sha256	b41430fc26fb8291ebd7b685a1b7b5124a4db37a16c855a623c643cdc0308c77
+repository	isomorphismes/wegert
+source_sha	873d03e86ec2e4a9236bb2d253fee3c8fde83b6c
+package_id	org.isomorphisms.wegert
+launcher_label	zero & infinity
+min_sdk	26
+packaging	shared
+requested_target	phone
+target	device	abi	obligation	acceptance
+phone	MIRO_A1	armeabi-v7a	required	not_run
+c67	MIRO_C67	arm64-v8a	required	not_run

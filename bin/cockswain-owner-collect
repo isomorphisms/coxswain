@@ -1,0 +1,146 @@
+#!/bin/sh
+set -eu
+
+[ "$#" -eq 2 ] || {
+    echo 'usage: cockswain-owner-collect OWNER_RECORD_DIRECTORY SNAPSHOT_DIRECTORY' >&2
+    exit 64
+}
+
+source_directory=$1
+snapshot_directory=$2
+script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+[ ! -e "$snapshot_directory" ] || {
+    printf 'cockswain: snapshot destination already exists: %s\n' "$snapshot_directory" >&2
+    exit 73
+}
+
+"$script_directory/cockswain-owner-state" --validate "$source_directory"
+
+parent=$(dirname -- "$snapshot_directory")
+mkdir -p "$parent"
+temporary=$snapshot_directory.$$.tmp
+mkdir "$temporary"
+trap 'rm -rf "$temporary"' EXIT HUP INT TERM
+
+before=$temporary/source-before.tsv
+after=$temporary/source-after.tsv
+for name in collection.tsv cells.tsv attempts.tsv owner-record.tsv; do
+    sha256sum "$source_directory/$name" >> "$before"
+    cp "$source_directory/$name" "$temporary/$name"
+done
+awk -F '\t' 'NR>1 && $9=="COMPLETE" {print $12} NR>1 && $9=="SUPERSEDED" {print $16}' \
+    "$source_directory/cells.tsv" | LC_ALL=C sort -u > "$temporary/evidence-files"
+while IFS= read -r evidence_file; do
+    [ -n "$evidence_file" ] || continue
+    mkdir -p "$temporary/$(dirname -- "$evidence_file")"
+    sha256sum "$source_directory/$evidence_file" >> "$before"
+    cp "$source_directory/$evidence_file" "$temporary/$evidence_file"
+done < "$temporary/evidence-files"
+
+if [ "${COCKSWAIN_OWNER_TEST_AFTER_COPY_CMD:-}" != "" ]; then
+    [ "${COCKSWAIN_OWNER_TESTING:-0}" = 1 ] || {
+        echo 'cockswain: owner copy hook is restricted to explicit test mode' >&2
+        exit 64
+    }
+    "$COCKSWAIN_OWNER_TEST_AFTER_COPY_CMD" "$source_directory"
+fi
+
+for name in collection.tsv cells.tsv attempts.tsv owner-record.tsv; do
+    sha256sum "$source_directory/$name" >> "$after"
+done
+while IFS= read -r evidence_file; do
+    [ -n "$evidence_file" ] || continue
+    sha256sum "$source_directory/$evidence_file" >> "$after"
+done < "$temporary/evidence-files"
+cmp -s "$before" "$after" || {
+    echo 'cockswain: owner record changed during collection' >&2
+    exit 65
+}
+
+rm "$before" "$after" "$temporary/evidence-files"
+"$script_directory/cockswain-owner-state" --validate "$temporary"
+
+owner=$(awk -F '\t' '$1=="owner" {print $2}' "$temporary/collection.tsv")
+owner_revision=$(awk -F '\t' '$1=="owner_revision" {print $2}' "$temporary/collection.tsv")
+owner_locator=$(awk -F '\t' '$1=="owner_locator" {print $2}' "$temporary/collection.tsv")
+owner_record_sha256=$(awk -F '\t' '$1=="owner_record_sha256" {print $2}' "$temporary/collection.tsv")
+policy_sha256=$(awk -F '\t' '$1=="policy_sha256" {print $2}' "$temporary/collection.tsv")
+profile_sha256=$(awk -F '\t' '$1=="profile_sha256" {print $2}' "$temporary/collection.tsv")
+cell_count=$(awk -F '\t' '$1=="observed_cells" {print $2}' "$temporary/collection.tsv")
+attempt_count=$(awk -F '\t' '$1=="observed_attempts" {print $2}' "$temporary/collection.tsv")
+collection_sha=$(sha256sum "$temporary/collection.tsv" | awk '{print $1}')
+cells_json=$(jq -Rn '
+    [inputs | split("\t")] as $rows |
+    $rows[0] as $header |
+    [$rows[1:][] as $row |
+      reduce range(0; $header | length) as $index
+        ({}; .[$header[$index]] = $row[$index])]
+' "$temporary/cells.tsv")
+attempts_json=$(jq -Rn '
+    [inputs | split("\t")] as $rows |
+    $rows[0] as $header |
+    [$rows[1:][] as $row |
+      reduce range(0; $header | length) as $index
+        ({}; .[$header[$index]] = $row[$index])]
+' "$temporary/attempts.tsv")
+
+jq -n \
+    --arg goal 'Advance every incomplete authoritative owner obligation without erasing evidence boundaries.' \
+    --arg snapshot "$snapshot_directory" \
+    --arg owner "$owner" \
+    --arg owner_revision "$owner_revision" \
+    --arg owner_locator "$owner_locator" \
+    --arg owner_record_sha256 "$owner_record_sha256" \
+    --arg policy_sha256 "$policy_sha256" \
+    --arg profile_sha256 "$profile_sha256" \
+    --arg collection_sha256 "$collection_sha" \
+    --argjson cell_count "$cell_count" \
+    --argjson attempt_count "$attempt_count" \
+    --argjson owner_obligations "$cells_json" \
+    --argjson owner_attempts "$attempts_json" \
+    '{
+      goal: $goal,
+      source: {
+        owner: $owner,
+        owner_revision: $owner_revision,
+        owner_locator: $owner_locator,
+        collection_sha256: $collection_sha256
+      },
+      state: {
+        owner_record_snapshot: $snapshot,
+        owner_record_collection: {
+          owner: $owner,
+          owner_revision: $owner_revision,
+          owner_locator: $owner_locator,
+          owner_record_sha256: $owner_record_sha256,
+          policy_sha256: $policy_sha256,
+          profile_sha256: $profile_sha256,
+          collection_sha256: $collection_sha256,
+          enumeration_complete: true,
+          cell_count: $cell_count,
+          attempt_count: $attempt_count
+        },
+        owner_obligations: $owner_obligations,
+        owner_attempts: $owner_attempts
+      },
+      unresolved: [],
+      done_when: [
+        "A fresh complete owner enumeration contains no actionable, failed, waiting, or human-only cell."
+      ],
+      chat_history: []
+    }' > "$temporary/work-item.json"
+
+{
+    printf 'schema\tcockswain-owner-collection-receipt-v1\n'
+    printf 'owner\t%s\n' "$owner"
+    printf 'owner_revision\t%s\n' "$owner_revision"
+    printf 'collection_sha256\t%s\n' "$collection_sha"
+    printf 'cells_sha256\t%s\n' "$(sha256sum "$temporary/cells.tsv" | awk '{print $1}')"
+    printf 'attempts_sha256\t%s\n' "$(sha256sum "$temporary/attempts.tsv" | awk '{print $1}')"
+    printf 'owner_record_sha256\t%s\n' "$(sha256sum "$temporary/owner-record.tsv" | awk '{print $1}')"
+} > "$temporary/receipt.tsv"
+
+mv "$temporary" "$snapshot_directory"
+trap - EXIT HUP INT TERM
+printf '%s\n' "$snapshot_directory/work-item.json"

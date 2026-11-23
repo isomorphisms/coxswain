@@ -10,14 +10,66 @@ if [ "$#" -ne 1 ]; then
 fi
 
 case_file=$1
-model=${COCKSWAIN_MODEL:?set COCKSWAIN_MODEL}
-base_url=${COCKSWAIN_BASE_URL:-http://127.0.0.1:8000/v1}
-send_reasoning=${COCKSWAIN_SEND_REASONING_EFFORT:-0}
 
 command -v jq >/dev/null 2>&1 || {
     printf 'cockswain: jq is required\n' >&2
     exit 69
 }
+
+owner_snapshot=$(jq -r '.state.owner_record_snapshot // ""' "$case_file") || {
+    echo 'cockswain: invalid work item JSON' >&2
+    exit 65
+}
+if [ -n "$owner_snapshot" ]; then
+    owner_state=${COCKSWAIN_OWNER_STATE_DIRECTORY:?set COCKSWAIN_OWNER_STATE_DIRECTORY}
+    decision=$("$repo_dir/bin/cockswain-owner-state" "$owner_snapshot" "$owner_state")
+    value() {
+        printf '%s\n' "$decision" | awk -F '\t' -v key="$1" '$1==key {print $2; found=1} END {exit !found}'
+    }
+    action=$(value action)
+    reason=$(value reason_code)
+    cell=$(value cell_id)
+    next=$(value next_action)
+    boundary=$(value evidence_boundary)
+    case "$action" in
+        CONTINUE)
+            next_prompt=$next
+            human_question=null
+            ;;
+        HUMAN)
+            next_prompt=null
+            human_question=$next
+            ;;
+        WAIT|DONE)
+            next_prompt=null
+            human_question=null
+            ;;
+        *)
+            printf 'cockswain: owner controller returned an invalid action: %s\n' "$action" >&2
+            exit 65
+            ;;
+    esac
+    jq -cn \
+        --arg action "$action" \
+        --arg reason "$reason" \
+        --arg cell "$cell" \
+        --arg boundary "$boundary" \
+        --arg next "$next_prompt" \
+        --arg human "$human_question" \
+        '{
+          action: $action,
+          rationale: ($reason + " at owner cell " + $cell),
+          next_prompt: (if $next == "null" or $next == "-" then null else $next end),
+          human_question: (if $human == "null" or $human == "-" then null else $human end),
+          evidence_gaps: (if $action == "DONE" then [] else [$boundary] end)
+        }'
+    exit 0
+fi
+
+model=${COCKSWAIN_MODEL:?set COCKSWAIN_MODEL}
+base_url=${COCKSWAIN_BASE_URL:-http://127.0.0.1:8000/v1}
+send_reasoning=${COCKSWAIN_SEND_REASONING_EFFORT:-0}
+
 command -v curl >/dev/null 2>&1 || {
     printf 'cockswain: curl is required\n' >&2
     exit 69
